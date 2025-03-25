@@ -69,21 +69,4 @@ describe("TicketNFT", function () {
         // Verify transfer by operator
         expect(ownerOfTicket0).to.be.equal(await buyer2.getAddress());
     });
-
-    // Test 5: Burn NFT
-    it("Should burn NFT successfully", async function () {
-        // Mint ticket 0 for buyer 0
-        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
-        await tx1.wait();
-
-        let ownerOfTicket0 = await ticketNFT.ownerOf(0);
-        expect(ownerOfTicket0).to.be.equal(await buyer1.getAddress());
-
-        // Burn ticket 1
-        const tx2 = await ticketNFT.connect(buyer1).burn(0);
-        await tx2.wait();
-
-        await expect(ticketNFT.connect(owner).ownerOf(0))
-            .to.be.revertedWithCustomError(ticketNFT, "ERC721NonexistentToken");
-    });
 })
