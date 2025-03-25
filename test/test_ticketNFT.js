@@ -4,10 +4,10 @@ const { ethers } = require("hardhat");
 describe("TicketNFT", function () {
     let TicketNFT;
     let ticketNFT;
-    let owner, player1, player2, others;
+    let owner, buyer1, buyer2, others;
 
     this.beforeEach(async function () {
-        [owner, player1, player2, ...others] = await ethers.getSigners();
+        [owner, buyer1, buyer2, ...others] = await ethers.getSigners();
 
         // deploy TicketNFT
         TicketNFT = await ethers.getContractFactory("TicketNFT");
@@ -22,6 +22,68 @@ describe("TicketNFT", function () {
 
     // Test 2: Mint ticket NFTs by different player
     it("Should mint ticket NFTs successfully", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
+        await tx1.wait();
 
+        // Mint ticket 1 for buyer 1
+        const tx2 = await ticketNFT.connect(owner).safeMint(buyer2);
+        await tx2.wait();
+
+        let ownerOfTicket0 = await ticketNFT.ownerOf(0);
+        let ownerOfTicket1 = await ticketNFT.ownerOf(1);
+
+        expect(ownerOfTicket0).to.be.equal(await buyer1.getAddress());
+        expect(ownerOfTicket1).to.be.equal(await buyer2.getAddress());
+    });
+
+    // Test 3: Only owner can mint
+    it("Should throw error when non-owner attempts to mint", async function () {
+        await expect(ticketNFT.connect(buyer1).safeMint(buyer1))
+            .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount");
+    });
+
+    // Test 4: Verify Approval for single NFT
+    it("Should approve single NFT transfer successfully", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
+        await tx1.wait();
+
+        await expect(ticketNFT.connect(owner).transferFrom(await buyer1.getAddress(), await buyer2.getAddress(), 0))
+            .to.be.revertedWithCustomError(ticketNFT, "ERC721InsufficientApproval");
+
+        // Buyer 1 approves owner for ticket 0
+        const tx2 = await ticketNFT.connect(buyer1).approve(await owner.getAddress(), 0);
+        await tx2.wait();
+        
+        // Verify approval of operator
+        let operatorOfTicket0 = await ticketNFT.getApproved(0);
+        expect(operatorOfTicket0).to.be.equal(await owner.getAddress());
+
+
+        const tx3 = await ticketNFT.connect(owner).transferFrom(await buyer1.getAddress(), await buyer2.getAddress(), 0);
+        await tx3.wait();
+
+        let ownerOfTicket0 = await ticketNFT.ownerOf(0);
+
+        // Verify transfer by operator
+        expect(ownerOfTicket0).to.be.equal(await buyer2.getAddress());
+    });
+
+    // Test 5: Burn NFT
+    it("Should burn NFT successfully", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
+        await tx1.wait();
+
+        let ownerOfTicket0 = await ticketNFT.ownerOf(0);
+        expect(ownerOfTicket0).to.be.equal(await buyer1.getAddress());
+
+        // Burn ticket 1
+        const tx2 = await ticketNFT.connect(buyer1).burn(0);
+        await tx2.wait();
+
+        await expect(ticketNFT.connect(owner).ownerOf(0))
+            .to.be.revertedWithCustomError(ticketNFT, "ERC721NonexistentToken");
     });
 })
