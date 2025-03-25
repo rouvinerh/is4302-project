@@ -96,4 +96,18 @@ describe("TicketNFT", function () {
         await expect(ticketNFT.connect(buyer1).redeemTicket(0))
             .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount");
     });
+
+    // Test 7: Cannot redeem already redeemed ticket
+    it("Should throw error when non-owner attempts to redeem", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
+        await tx1.wait();
+
+        // Redeem the ticket
+        const tx2 = await ticketNFT.connect(owner).redeemTicket(0);
+        await tx2.wait();
+
+        // Attempt to redeem the same ticket again
+        await expect(ticketNFT.connect(owner).redeemTicket(0)).to.be.revertedWith("Ticket has already been redeemed.");
+    });
 })

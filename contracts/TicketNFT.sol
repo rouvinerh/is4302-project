@@ -67,7 +67,7 @@ contract TicketNFT is ERC721, Ownable {
     }
     
     function redeemTicket(uint256 ticketId) public validTicketId(ticketId) onlyOwner {
-        require(tickets[ticketId].state != ticketState.redeemed, "Ticket has already been redeemed");
+        require(tickets[ticketId].state != ticketState.redeemed, "Ticket has already been redeemed.");
 
         tickets[ticketId].state = ticketState.redeemed;
     }
