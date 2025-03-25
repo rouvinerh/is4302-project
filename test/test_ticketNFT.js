@@ -69,4 +69,31 @@ describe("TicketNFT", function () {
         // Verify transfer by operator
         expect(ownerOfTicket0).to.be.equal(await buyer2.getAddress());
     });
+
+    // Test 5: Redeem Ticket
+    it("Should redeem ticket successfully", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
+        await tx1.wait();
+
+        // Check initial ticket state
+        expect(await ticketNFT.getTicketState(0)).to.equal(0);
+
+        // Redeem the ticket
+        const tx2 = await ticketNFT.connect(owner).redeemTicket(0);
+        await tx2.wait();
+
+        // Check that the ticket is now redeemed
+        expect(await ticketNFT.getTicketState(0)).to.equal(1);
+    });
+
+     // Test 6: Only owner can redeem Ticket
+     it("Should throw error when non-owner attempts to redeem", async function () {
+        // Mint ticket 0 for buyer 0
+        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
+        await tx1.wait();
+
+        await expect(ticketNFT.connect(buyer1).redeemTicket(0))
+            .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount");
+    });
 })
