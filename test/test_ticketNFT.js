@@ -23,11 +23,11 @@ describe("TicketNFT", function () {
     // Test 2: Mint ticket NFTs by different player
     it("Should mint ticket NFTs successfully", async function () {
         // Mint ticket 0 for buyer 0
-        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
+        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
         await tx1.wait();
 
         // Mint ticket 1 for buyer 1
-        const tx2 = await ticketNFT.connect(owner).safeMint(buyer2);
+        const tx2 = await ticketNFT.connect(owner).createTicket(buyer2, "Event Name", 123213131, "A", "A2", 100);
         await tx2.wait();
 
         let ownerOfTicket0 = await ticketNFT.ownerOf(0);
@@ -39,14 +39,14 @@ describe("TicketNFT", function () {
 
     // Test 3: Only owner can mint
     it("Should throw error when non-owner attempts to mint", async function () {
-        await expect(ticketNFT.connect(buyer1).safeMint(buyer1))
+        await expect(ticketNFT.connect(buyer1).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100))
             .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount");
     });
 
     // Test 4: Verify Approval for single NFT
     it("Should approve single NFT transfer successfully", async function () {
         // Mint ticket 0 for buyer 0
-        const tx1 = await ticketNFT.connect(owner).safeMint(buyer1);
+        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
         await tx1.wait();
 
         await expect(ticketNFT.connect(owner).transferFrom(await buyer1.getAddress(), await buyer2.getAddress(), 0))
