@@ -45,7 +45,7 @@ contract TicketNFT is ERC721, Ownable {
         uint256 eventTime, //unix timestamp 
         string memory category, 
         string memory seatNumber, 
-        uint256 price
+        uint256 price // CONSTANT, different from order price
     ) public onlyOwner returns (uint256) {
         uint256 tokenId = _nextTokenId++;
 
@@ -68,7 +68,7 @@ contract TicketNFT is ERC721, Ownable {
     
     function redeemTicket(uint256 ticketId) public validTicketId(ticketId) onlyOwner {
         require(tickets[ticketId].state != ticketState.redeemed, "Ticket has already been redeemed.");
-
+        // redeem loyalty points here?
         tickets[ticketId].state = ticketState.redeemed;
     }
 
