@@ -45,6 +45,13 @@ contract TicketMarketplace {
     event TicketUnlisted(uint256 orderId);
     event TicketRedeemed(uint256 ticketId, address owner);
 
+    uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
+
+    function sgdToWei(uint256 sgdAmount) public pure returns (uint256) {
+        return (sgdAmount * 1e18) / ETH_TO_SGD;
+    }
+
+
     modifier onlyAdmin() {
         require(userRoles[msg.sender] == UserRole.ADMIN, "Not admin!");
         _;
@@ -90,6 +97,14 @@ contract TicketMarketplace {
         uint256 loyaltyPointsToRedeem
     ) external payable {
         address buyer = msg.sender;
+        require(loyaltyPoints[buyer] >= loyaltyPointsToRedeem, "Not enough loyalty points");
+
+        string memory eventName = eventNames[eventId];
+        uint256 ticketPriceSGD = ticket.getPrice;
+        uint256 sgdRemaining = ticketPriceSGD - (loyaltyPointsToRedeem/100);
+        uint256 requiredEth = sgdToWei(sgdRemaining);
+        require(msg.value == requiredEth, "Incorrect ETH sent");
+
         loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
         // transfer ticket over to buyer logic @ price, make payable
         // emit event
@@ -103,6 +118,7 @@ contract TicketMarketplace {
         // loop through mapping of userID -> ticketId for each ticket, check event Id.
         // If eventId matches, put in array list.
         // produces array list of eventIds
+        emit TicketRedeemed(ticketId, user);
     }
 
     function listOrder(
@@ -147,7 +163,9 @@ contract TicketMarketplace {
         );
         require(loyaltyPointsRedeemed <= price, "Too many points used");
 
-        uint256 requiredEth = price - (loyaltyPointsRedeemed / 100); //assume 100 loyalty point = 1 SGD
+        require(loyaltyPoints[buyer] >= loyaltyPointsRedeemed, "Not enough loyalty points");
+        uint256 sgdRemaining = price - (loyaltyPointsRedeemed/100); //assume 100 loyalty point = 1 SGD
+        uint256 requiredEth = sgdToWei(sgdRemaining);
         require(msg.value == requiredEth, "Incorrect ETH sent"); //implement eth to sgd conversion later
 
         // burn loyalty points
