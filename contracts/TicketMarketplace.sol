@@ -3,9 +3,10 @@
 pragma solidity ^0.8.22;
 
 import "./TicketNFT.sol";
+import "./LoyaltyToken.sol";
 
 contract TicketMarketplace {
-    enum userRole { 
+    enum userRole {
         USER,
         EVENT_ORGANISER,
         ADMIN
@@ -19,18 +20,28 @@ contract TicketMarketplace {
 
     TicketNFT public ticket;
     uint256 private _nextEventId = 0;
-    
-    uint256 public orderCounter; 
+
+    uint256 public orderCounter;
     // 1 ETH = 100 SGD
     mapping(address => userRole) public userRoles;
     mapping(uint256 => Order) public orders;
     mapping(uint256 => string) public eventNames;
-    mapping(address => uint256) public userToTicket; 
+    mapping(address => uint256) public userToTicket;
     mapping(address => uint256) public loyaltyPoints;
 
     event EventCreated(uint256 eventId, string eventName);
-    event TicketListed(uint256 orderId, address seller, uint256 ticketId, uint256 price);
-    event TicketBought(uint256 orderId, address buyer, uint256 ticketId, uint256 price);
+    event TicketListed(
+        uint256 orderId,
+        address seller,
+        uint256 ticketId,
+        uint256 price
+    );
+    event TicketBought(
+        uint256 orderId,
+        address buyer,
+        uint256 ticketId,
+        uint256 price
+    );
     event TicketUnlisted(uint256 orderId);
     event TicketRedeemed(uint256 ticketId, address owner);
 
@@ -40,7 +51,10 @@ contract TicketMarketplace {
     }
 
     modifier onlyEventOrganiser() {
-        require(userRoles[msg.sender] == UserRole.EVENT_ORGANISER, "Not organiser!");
+        require(
+            userRoles[msg.sender] == UserRole.EVENT_ORGANISER,
+            "Not organiser!"
+        );
         _;
     }
 
@@ -48,7 +62,10 @@ contract TicketMarketplace {
         ticketNFT = TicketNFT(_ticketNFT);
     }
 
-    function createEvent(string memory eventName, uint256 eventTime) public onlyEventOrganiser {
+    function createEvent(
+        string memory eventName,
+        uint256 eventTime
+    ) public onlyEventOrganiser {
         uint256 eventId = _nextEventId++; // Assign current value, then increment
         eventNames[eventId] = eventName;
 
@@ -57,11 +74,21 @@ contract TicketMarketplace {
         // assume simple stuff cus 12000 is hella gas
         for (uint256 i = 0; i < 200; i++) {
             // first 2k is cat A, etc.
-            ticketNFT.createTicket(msg.sender, eventName, eventTime, "catA", "1", 148);
+            ticketNFT.createTicket(
+                msg.sender,
+                eventName,
+                eventTime,
+                "catA",
+                "1",
+                148
+            );
         }
     }
     // transact in Wei/Eth
-    function buyTicket(uint256 eventId, uint256 loyaltyPointsToRedeem) payable external {
+    function buyTicket(
+        uint256 eventId,
+        uint256 loyaltyPointsToRedeem
+    ) external payable {
         address buyer = msg.sender;
         loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
         // transfer ticket over to buyer logic @ price, make payable
@@ -78,31 +105,118 @@ contract TicketMarketplace {
         // produces array list of eventIds
     }
 
-    function listOrder(uint256 eventId, uint256 listedPrice, uint256 qty) returns (uint256) {
-        require(listedPrice < ticket.getPrice(ticketId), "listed price cannot be more than original price.");
+    function listOrder(
+        uint256 eventId,
+        uint256 listedPrice,
+        uint256 qty
+    ) returns (uint256) {
+        require(
+            listedPrice <= ticket.getPrice(ticketId),
+            "listed price cannot be more than original price."
+        );
+        require(
+            ticket.ownerOf(ticketId) == msg.sender,
+            "You don't own this ticket"
+        );
 
         orderCounter += 1;
         orders[orderCounter].seller = msg.sender;
         orders[orderCounter].ticketId = ticketId; // idk how get
         orders[orderCounter].price = listedPrice;
 
-        // transfer ticket to marketplace
-        return orderCounter; 
+        ticket.transferFrom(msg.sender, address(this), ticketId);
+        emit TicketListed(orderCounter, msg.sender, ticketId, listedPrice);
+
+        return orderCounter;
     }
 
-    function buyOrder(uint256 orderId, uint256 loyaltyPointsRedeemed) payable external {
-        address seller = orders[orderCounter].seller;
-        uint256 ticketId = orders[orderCounter].ticketId;
-        uint256 price = orders[orderCounter].price;
-        loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
-        price -= loyaltyPointsRedeemed;
+    function buyOrder(
+        uint256 orderId,
+        uint256 loyaltyPointsRedeemed
+    ) external payable {
+        Order storage order = orders[orderId];
+        require(order.seller != address(0), "Order does not exist");
+
+        address buyer = msg.sender;
+        uint256 ticketId = order.ticketId;
+        uint256 price = order.price;
+
+        require(
+            loyaltyPoints[buyer] >= loyaltyPointsRedeemed,
+            "Not enough loyalty points"
+        );
+        require(loyaltyPointsRedeemed <= price, "Too many points used");
+
+        uint256 requiredEth = price - (loyaltyPointsRedeemed / 100); //assume 100 loyalty point = 1 SGD
+        require(msg.value == requiredEth, "Incorrect ETH sent"); //implement eth to sgd conversion later
+
+        // burn loyalty points
+        loyaltyPoints[buyer] -= loyaltyPointsRedeemed;
+
+        // contract pay seller full price
+        payable(order.seller).transfer(price);
+
+        ticket.transferFrom(address(this), buyer, ticketId);
+        delete orders[orderId];
+
+        emit TicketBought(orderId, buyer, ticketId, price);
     }
 
-    function unlistOrder(){
-        // midterm
+    function unlistOrder() {
+        Order storage order = orders[orderId];
+        require(order.seller != address(0), "Order does not exist");
+        require(order.seller == msg.sender, "Not your order");
+
+        ticket.transferFrom(address(this), msg.sender, order.ticketId);
+        delete orders[orderId];
+
+        emit TicketUnlisted(orderId);
     }
 
-    function search() {
-        // midterm
+    function editOrder(uint256 orderId, uint256 newPrice) external {
+        Order storage order = orders[orderId];
+        require(order.seller != address(0), "Order does not exist");
+        require(order.seller == msg.sender, "Not your order");
+
+        require(
+            newPrice <= ticket.getPrice(order.ticketId),
+            "New price exceeds original ticket price"
+        );
+
+        order.price = newPrice;
+    }
+
+    function search(
+        string memory desiredEventName,
+        string memory desiredCategory,
+        uint256 maxPrice
+    ) external view returns (uint256 bestOrderId, uint256 bestPrice) {
+        uint256 lowestPrice = type(uint256).max;
+
+        for (uint256 i = 1; i <= orderCounter; i++) {
+            Order storage order = orders[i];
+            if (order.seller == address(0)) continue;
+
+            uint256 ticketId = order.ticketId;
+            TicketNFT.ticket memory t = ticket.tickets(ticketId);
+
+            if (
+                keccak256(bytes(t.eventName)) ==
+                keccak256(bytes(desiredEventName)) &&
+                keccak256(bytes(t.category)) ==
+                keccak256(bytes(desiredCategory)) &&
+                order.price <= maxPrice &&
+                order.price < lowestPrice
+            ) {
+                lowestPrice = order.price;
+                bestOrderId = i;
+            }
+        }
+
+        if (bestOrderId == 0) {
+            revert("No matching offers");
+        }
+
+        bestPrice = lowestPrice;
     }
 }
