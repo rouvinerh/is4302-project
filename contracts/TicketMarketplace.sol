@@ -22,11 +22,11 @@ contract TicketMarketplace {
     uint256 private _nextEventId = 0;
 
     uint256 public orderCounter;
-    // 1 ETH = 100 SGD
     mapping(address => userRole) public userRoles;
     mapping(uint256 => Order) public orders;
     mapping(uint256 => string) public eventNames;
-    mapping(address => uint256) public userToTicket;
+    //map each address to multiple tickets
+    mapping(address => TicketNFT[]) public userToTickets;
     mapping(address => uint256) public loyaltyPoints;
 
     event EventCreated(uint256 eventId, string eventName);
@@ -80,17 +80,26 @@ contract TicketMarketplace {
 
         // assume simple stuff cus 12000 is hella gas
         for (uint256 i = 0; i < 200; i++) {
-            // first 2k is cat A, etc.
+            string memory category;
+            if (i < 40) {
+                category = "catA";
+            } else if (i < 100) { 
+                category = "catB";
+            } else {
+                category = "catC";
+            }
+
             ticketNFT.createTicket(
                 msg.sender,
                 eventName,
                 eventTime,
-                "catA",
+                category,
                 "1",
                 148
             );
         }
     }
+
     // transact in Wei/Eth
     function buyTicket(
         uint256 eventId,
@@ -115,10 +124,25 @@ contract TicketMarketplace {
         loyaltyPoints[user] += ticket.getPrice(); // need this joshua pookiebear
         ticket.redeemTicket();
         // idk how get ticket id joshua :(
-        // loop through mapping of userID -> ticketId for each ticket, check event Id.
+        getTicketForEvent()
         // If eventId matches, put in array list.
         // produces array list of eventIds
         emit TicketRedeemed(ticketId, user);
+    }
+
+    function getTicketForEvent (
+        uint256 eventId, 
+        address user
+    ) returns (TicketNFT[]) {
+        // loop through mapping of userID -> ticketId for each ticket, check event Id.
+        TicketNFT[] listOfTickets = userToTicket[user]; 
+        TicketNFT[] result; 
+        for (uint256 i = 1; i <= listOfTickets.length; i++) {
+            //how get ticket id
+            if(TicketNFT[i].getEvent(1231)) {
+                result.pop(TicketNFT[i]);
+            }
+        }
     }
 
     function listOrder(

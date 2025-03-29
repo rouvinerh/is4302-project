@@ -83,4 +83,8 @@ contract TicketNFT is ERC721, Ownable {
     function getTicketState(uint256 ticketId) public view validTicketId(ticketId) returns (ticketState) {
         return tickets[ticketId].state;
     }
+
+    function getEvent(uint256 ticketId) public view validTicketId(ticketId) returns (string) {
+        return tickets[ticketId].eventName;
+    }
 }
