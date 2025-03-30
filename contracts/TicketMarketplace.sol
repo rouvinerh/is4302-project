@@ -120,6 +120,11 @@ contract TicketMarketplace {
     }
 
     function redeemTicket(uint256 eventId) {
+        require(
+            block.timestamp < ticket.getEventTime(ticketId),
+            "Cannot redem ticket for expired events."
+        );
+
         address user = msg.sender;
         loyaltyPoints[user] += ticket.getPrice(); // need this joshua pookiebear
         ticket.redeemTicket();
@@ -151,12 +156,20 @@ contract TicketMarketplace {
         uint256 qty
     ) returns (uint256) {
         require(
+            block.timestamp < ticket.getEventTime(ticketId),
+            "Cannot list tickets for expired events."
+        );
+        require(
+            listedPrice > 0, 
+            "Listed price must be greater than zero."
+        );
+        require(
             listedPrice <= ticket.getPrice(ticketId),
-            "listed price cannot be more than original price."
+            "Listed price cannot be more than original price."
         );
         require(
             ticket.ownerOf(ticketId) == msg.sender,
-            "You don't own this ticket"
+            "You don't own this ticket."
         );
 
         orderCounter += 1;
@@ -180,6 +193,11 @@ contract TicketMarketplace {
         address buyer = msg.sender;
         uint256 ticketId = order.ticketId;
         uint256 price = order.price;
+
+        require(
+            block.timestamp < ticket.getEventTime(ticketId),
+            "Cannot list tickets for expired events."
+        );
 
         require(
             loyaltyPoints[buyer] >= loyaltyPointsRedeemed,
