@@ -125,6 +125,7 @@ contract TicketMarketplace {
         //cat 
     ) external payable {
         address buyer = msg.sender;
+        require(userWallet[buyer][eventId].length < 4, "Purchase limit exceeded. You can only own 4 tickets per event.");
         require(loyaltyPoints[buyer] >= loyaltyPointsToRedeem, "Not enough loyalty points");
 
         string memory eventName = eventNames[eventId];
@@ -148,25 +149,9 @@ contract TicketMarketplace {
         loyaltyPoints[user] += ticket.getPrice(); // need this joshua pookiebear
         ticket.redeemTicket();
         // idk how get ticket id joshua :(
-        getTicketForEvent()
         // If eventId matches, put in array list.
         // produces array list of eventIds
         emit TicketRedeemed(ticketId, user);
-    }
-
-    function getTicketForEvent (
-        uint256 eventId, 
-        address user
-    ) returns (TicketNFT[]) {
-        // loop through mapping of userID -> ticketId for each ticket, check event Id.
-        TicketNFT[] listOfTickets = userToTicket[user]; 
-        TicketNFT[] result; 
-        for (uint256 i = 1; i <= listOfTickets.length; i++) {
-            //how get ticket id
-            if(TicketNFT[i].getEvent(1231)) {
-                result.pop(TicketNFT[i]);
-            }
-        }
     }
 
     function listOrder(
