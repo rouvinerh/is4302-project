@@ -18,15 +18,27 @@ contract TicketMarketplace {
         uint256 price;
     }
 
+    /*
+    Struct Event to do the two below
+    mapping event org -> eventId
+    */
+    mapping(uint256 => string) public eventNames;
+
     TicketNFT public ticket;
     uint256 private _nextEventId = 0;
 
     uint256 public orderCounter;
     mapping(address => userRole) public userRoles;
     mapping(uint256 => Order) public orders;
-    mapping(uint256 => string) public eventNames;
-    //map each address to multiple tickets
-    mapping(address => TicketNFT[]) public userToTickets;
+
+
+
+    //nested mapping from address --> event --> [] of ticketId
+    mapping(address => mapping(uint256 => uint256[])) public userWallet;
+
+    // event --> [] of ticketId
+    mapping(uint256 => uint256[]) public marketWallet;
+
     mapping(address => uint256) public loyaltyPoints;
 
     event EventCreated(uint256 eventId, string eventName);
@@ -97,13 +109,20 @@ contract TicketMarketplace {
                 "1",
                 148
             );
+            //EVENT -> TICKET
+            //store new tickets to the mapping marketWallet;
         }
+    }
+
+    function payOrganiser{
+    //logic pay everything - 10% 
     }
 
     // transact in Wei/Eth
     function buyTicket(
         uint256 eventId,
         uint256 loyaltyPointsToRedeem
+        //cat 
     ) external payable {
         address buyer = msg.sender;
         require(loyaltyPoints[buyer] >= loyaltyPointsToRedeem, "Not enough loyalty points");
@@ -119,10 +138,10 @@ contract TicketMarketplace {
         // emit event
     }
 
-    function redeemTicket(uint256 eventId) {
+    function redeemTicket(uint256 ticketId) {
         require(
             block.timestamp < ticket.getEventTime(ticketId),
-            "Cannot redem ticket for expired events."
+            "Cannot redeem ticket for expired events."
         );
 
         address user = msg.sender;
@@ -280,3 +299,12 @@ contract TicketMarketplace {
         bestPrice = lowestPrice;
     }
 }
+
+
+/*
+to do 
+
+    - Ticket mapping to make primary buying easier
+    -  Buy Ticket -> Ticekt mapping (Event -> ticketId) -> give them next avail tix with regards to cat and event
+
+*/
