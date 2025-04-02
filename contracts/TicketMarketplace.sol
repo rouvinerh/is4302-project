@@ -148,7 +148,7 @@ contract TicketMarketplace {
         // assume prevOnly transferred to TicketMarketplace
         // transfer ticket over to buyer logic @ price, make payable
         ticket.transferTicket(buyer, ticketId);
-        payable(ticketDetails.prevOwner).transfer(ticketPriceSGD); //TODO: need convert to weiToSGD 
+        payable(ticketDetails.prevOwner).transfer(ticketPriceSGD); //TODO: need convert to weiToSGD & take 10% commission
         
         userWallet[buyer][ticketDetails.eventId].push(ticketId);
         //TODO: update prevOwners userWallet
