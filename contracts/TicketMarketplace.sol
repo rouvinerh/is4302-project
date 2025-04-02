@@ -6,57 +6,46 @@ import "./TicketNFT.sol";
 import "./LoyaltyToken.sol";
 
 contract TicketMarketplace {
-    enum userRole {
+    enum userRoleEnum {
         USER,
         EVENT_ORGANISER,
         ADMIN
     }
 
     struct Event {
-        string name;
+        uint256 eventId;
+        string eventName;
+        uint256 eventTime;
         address organiser;
     }
 
-    struct Order {
-        address seller;
-        uint256 eventId;
-        uint256 ticketId;
-        uint256 price;
-    }
+    // struct Order {
+    //     address seller;
+    //     uint256 eventId;
+    //     uint256 ticketId;
+    //     uint256 price;
+    // }
 
     TicketNFT public ticket;
-    uint256 private _nextEventId = 0;
-    uint256 public orderCounter;
+    uint256 private _nextEventId;
+    uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
+    // uint256 public orderCounter;
+
     mapping(address => userRole) public userRoles;
-    mapping(uint256 => Event) public events;
-    mapping(uint256 => Order) public orders;
-    //nested mapping from address --> event --> [] of ticketId
-    mapping(address => mapping(uint256 => uint256[])) public userWallet;
-    // event --> [] of ticketId
-    mapping(uint256 => uint256[]) public marketWallet;
+    mapping(uint256 => Event) public events; //eventId to event struct
+    mapping(address => uint256[]) public eventsOrganised; //event organiser address to [] of eventIds organised
+    mapping(uint256 => uint256[]) public ticketsForSale; // "marketWallet" eventId --> [] of ticketId
+    mapping(uint256 => uint256) public ticketToIndex; // ticketId → index in ticketsForSale array
+    mapping(address => mapping(uint256 => uint256[])) public userWallet; //nested mapping from address --> event --> [] of ticketId
     mapping(address => uint256) public loyaltyPoints;
 
+    // mapping(uint256 => Order) public orders;
+
     event EventCreated(uint256 eventId, string eventName);
-    event TicketListed(
-        uint256 orderId,
-        address seller,
-        uint256 ticketId,
-        uint256 price
-    );
-    event TicketBought(
-        uint256 orderId,
-        address buyer,
-        uint256 ticketId,
-        uint256 price
-    );
-    event TicketUnlisted(uint256 orderId);
+    event TicketBought(uint256 ticketId, address buyer, uint256 price);
+    event TicketListed(uint256 ticketId, address seller, uint256 price);
+    event TicketUnlisted(uint256 ticketId);
     event TicketRedeemed(uint256 ticketId, address owner);
-
-    uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
-
-    function sgdToWei(uint256 sgdAmount) public pure returns (uint256) {
-        return (sgdAmount * 1e18) / ETH_TO_SGD;
-    }
 
     modifier onlyAdmin() {
         require(userRoles[msg.sender] == UserRole.ADMIN, "Not admin!");
@@ -75,15 +64,38 @@ contract TicketMarketplace {
         ticketNFT = TicketNFT(_ticketNFT);
     }
 
+    /* Helper Functions */
+
+    function sgdToWei(uint256 sgdAmount) public pure returns (uint256) {
+        return (sgdAmount * 1e18) / ETH_TO_SGD;
+    }
+    // remove ticketId from ticketsForSale (pop-and-swap design to save gas)
+    function removeFromTicketsForSale(uint256 eventId, uint256 ticketId) internal {
+        uint256 index = ticketToIndex[ticketId];
+        uint256[] storage eventTicketSaleList = ticketsForSale[eventId];
+        if (index != eventTicketSaleList.length - 1) {
+            uint256 lastTicketId = eventTicketSaleList[eventTicketSaleList.length - 1];
+            eventTicketSaleList[index] = lastTicketId;
+            ticketToIndex[lastTicketId] = index;
+        }
+        eventTicketSaleList.pop();
+        delete ticketToIndex[ticketId];
+    }
+
+    /* Main Functions */
+
+    // we should make this method payable and charge eventOrg for creating events
     function createEvent(
         string memory eventName,
         uint256 eventTime
     ) public onlyEventOrganiser {
-        uint256 eventId = _nextEventId++; // Assign current value, then increment
-        events[eventId].name = eventName;
-        events[eventId].organiser = msg.sender
+        uint256 memory eventId = _nextEventId++;
 
-        emit EventCreated(eventId, eventName);
+        events[eventId].name = eventName;
+        events[eventId].eventTime = eventTime;
+        events[eventId].organiser = msg.sender;
+
+        eventsOrganised[msg.sender].push(eventId);
 
         // assume simple stuff cus 12000 is hella gas
         for (uint256 i = 0; i < 200; i++) {
@@ -96,48 +108,60 @@ contract TicketMarketplace {
                 category = "catC";
             }
 
-            ticketNFT.createTicket(
-                msg.sender,
-                eventName,
-                eventTime,
+            returnedTicketId = ticketNFT.createTicket(
+                eventId,
+                msg.sender, //event org address
                 category,
-                "1",
-                148
+                i,  //seat number
+                100 //price, CONSTANT for now but need to handle logic for diff price for diff category
             );
-            //EVENT -> TICKET
-            //store new tickets to the mapping marketWallet;
-        }
-    }
 
-    function payOrganiser{
-    //logic pay everything - 10% 
+            //store new tickets to the mapping ticketsForSale;
+            ticketsForSale[eventId].push(returnedTicketId);
+            ticketToIndex[ticketId] = ticketsForSale[eventId].length - 1;
+            // userWallet[msg.sender][eventId].push(returnedTicketId);  //maybe dont need this
+        }
+
+        emit EventCreated(eventId, eventName);
     }
 
     // transact in Wei/Eth
     function buyTicket(
-        uint256 eventId,
+        // uint256 eventId,
+        uint256 ticketId,
         uint256 loyaltyPointsToRedeem
         //cat 
     ) external payable {
-        address buyer = msg.sender;
+        address memory buyer = msg.sender;
+        ticket memory ticketDetails = ticket.getTicketDetails(ticketId);
 
-        require(userWallet[buyer][eventId].length < 4, "Purchase limit exceeded. You can only own 4 tickets per event.");
-
+        require(userWallet[buyer][ticketDetails.eventId].length < 4, "Purchase limit exceeded. You can only own 4 tickets per event.");
         require(loyaltyPoints[buyer] >= loyaltyPointsToRedeem, "Not enough loyalty points");
-
-        require(marketWallet[eventId].length > 0, "Sold out");
-        uint256 ticketId = marketWallet[eventId][marketWallet[eventId].length - 1]; // get last ticket in the array so tht we can use pop() instead of delete() since we want to remove ticket from array
-        string memory eventName = eventNames[eventId];
-        uint256 ticketPriceSGD = ticket.getPrice(ticketId);;
+        
+        uint256 ticketPriceSGD = ticketDetails.price;
         uint256 sgdRemaining = ticketPriceSGD - (loyaltyPointsToRedeem/100);
         uint256 requiredEth = sgdToWei(sgdRemaining);
         require(msg.value == requiredEth, "Incorrect ETH sent");
 
         loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
+
+        // assume prevOnly transferred to TicketMarketplace
         // transfer ticket over to buyer logic @ price, make payable
-        userWallet[buyer][eventId].push(ticketId);
-        marketWallet[eventId].pop();
+        ticket.transferTicket(buyer, ticketId);
+        payable(ticketDetails.prevOwner).transfer(ticketPriceSGD); //TODO: need convert to weiToSGD 
+        
+        userWallet[buyer][ticketDetails.eventId].push(ticketId);
+        //TODO: update prevOwners userWallet
+        
+        // helper function
+        removeFromTicketsForSale(ticketDetails.eventId, ticketId);
+
         // emit event
+        emit TicketBought(ticketId, buyer, ticketPriceSGD)
+
+        // require(marketWallet[eventId].length > 0, "Sold out"); shouldnt need this, FE should only display tickets from ticketsForSale mapping
+        // uint256 ticketId = marketWallet[eventId][marketWallet[eventId].length - 1]; // get last ticket in the array so tht we can use pop() instead of delete() since we want to remove ticket from array
+        // string memory eventName = eventNames[eventId];
     }
 
     function redeemTicket(uint256 ticketId) {
@@ -146,19 +170,16 @@ contract TicketMarketplace {
             "Cannot redeem ticket for expired events."
         );
 
-        address user = msg.sender;
-        loyaltyPoints[user] += ticket.getPrice(ticketId); // need this joshua pookiebear
+        address owner = msg.sender;
         ticket.redeemTicket(ticketId);
-        // idk how get ticket id joshua :(
-        // If eventId matches, put in array list.
-        // produces array list of eventIds
-        emit TicketRedeemed(ticketId, user);
+        loyaltyPoints[user] += ticket.getPrice(ticketId); 
+
+        emit TicketRedeemed(ticketId, owner);
     }
 
-    function listOrder(
-        uint256 eventId,
-        uint256 listedPrice,
-        uint256 qty
+    function listTicket(
+        uint256 ticketId,
+        uint256 listedPrice
     ) returns (uint256) {
         require(
             block.timestamp < ticket.getEventTime(ticketId),
@@ -172,89 +193,39 @@ contract TicketMarketplace {
             listedPrice <= ticket.getPrice(ticketId),
             "Listed price cannot be more than original price."
         );
-        require(
-            ticket.ownerOf(ticketId) == msg.sender,
-            "You don't own this ticket."
-        );
+        // require(
+        //     ticket.ownerOf(ticketId) == msg.sender,
+        //     "You don't own this ticket."
+        // );
 
-        orderCounter += 1;
-        orders[orderCounter].seller = msg.sender;
-        orders[orderCounter].eventId = eventId;
-        orders[orderCounter].ticketId = ticketId; // idk how get
-        orders[orderCounter].price = listedPrice;
 
-        ticket.transferFrom(msg.sender, address(this), ticketId);
-        emit TicketListed(orderCounter, msg.sender, ticketId, listedPrice);
+        // assume owner manually transfer to TicketMarketplace
+        // ticket.transferTicket(ticketId, address(this));
 
-        return orderCounter;
+        //store listed tickets to the mapping ticketsForSale;
+        ticketsForSale[eventId].push(returnedTicketId);
+        ticketToIndex[ticketId] = ticketsForSale[eventId].length - 1;
+
+        emit TicketListed(uint256 ticketId, msg.sender, uint256 listedPrice);
+
+        // orderCounter += 1;
+        // orders[orderCounter].seller = msg.sender;
+        // orders[orderCounter].eventId = eventId;
+        // orders[orderCounter].ticketId = ticketId; // idk how get
+        // orders[orderCounter].price = listedPrice;
+        // return orderCounter;
     }
 
-    function buyOrder(
-        uint256 orderId,
-        uint256 loyaltyPointsRedeemed
-    ) external payable {
-        Order storage order = orders[orderId];
-        require(order.seller != address(0), "Order does not exist");
+    function unlistTicket(uint256 ticketId) {
+        ticket memory ticketDetails = ticket.getTicketDetails(ticketId);
+        ticket.transferTicket(address(this), msg.sender, ticketId);
 
-        address buyer = msg.sender;
-        uint256 eventId = order.eventId;
-        uint256 ticketId = order.ticketId;
-        uint256 price = order.price;
+        // helper function
+        removeFromTicketsForSale(ticketDetails.eventId, ticketId);
 
-        require(
-            block.timestamp < ticket.getEventTime(ticketId),
-            "Cannot buy tickets for expired events."
-        );
-        require(
-            userWallet[buyer][eventId].length < 4,
-            "Purchase limit exceeded. You can only own 4 tickets per event."
-        );
-        require(
-            loyaltyPoints[buyer] >= loyaltyPointsRedeemed,
-            "Not enough loyalty points"
-        );
-        require(loyaltyPointsRedeemed <= price, "Too many points used");
-
-        require(loyaltyPoints[buyer] >= loyaltyPointsRedeemed, "Not enough loyalty points");
-        uint256 sgdRemaining = price - (loyaltyPointsRedeemed/100); //assume 100 loyalty point = 1 SGD
-        uint256 requiredEth = sgdToWei(sgdRemaining);
-        require(msg.value == requiredEth, "Incorrect ETH sent"); //implement eth to sgd conversion later
-
-        // burn loyalty points
-        loyaltyPoints[buyer] -= loyaltyPointsRedeemed;
-
-        // contract pay seller full price
-        payable(order.seller).transfer(price);
-
-        ticket.transferFrom(address(this), buyer, ticketId);
-        delete orders[orderId];
-
-        emit TicketBought(orderId, buyer, ticketId, price);
+        emit TicketUnlisted( ticketId);
     }
 
-    function unlistOrder(uint256 orderId) {
-        Order storage order = orders[orderId];
-        require(order.seller != address(0), "Order does not exist");
-        require(order.seller == msg.sender, "Not your order");
-
-        ticket.transferFrom(address(this), msg.sender, order.ticketId);
-        delete orders[orderId];
-
-        emit TicketUnlisted(orderId);
-    }
-
-    function editOrder(uint256 orderId, uint256 newPrice) external {
-        Order storage order = orders[orderId];
-        require(order.seller != address(0), "Order does not exist");
-        require(order.seller == msg.sender, "Not your order");
-
-        require(
-            newPrice <= ticket.getPrice(order.ticketId),
-            "New price exceeds original ticket price"
-        );
-
-        order.price = newPrice;
-    }
 
     function search(
         string memory desiredEventName,
@@ -289,13 +260,64 @@ contract TicketMarketplace {
 
         bestPrice = lowestPrice;
     }
+
+    // function payOrganiser{
+    // //logic pay everything - 10% 
+    // }
+
+    // function editOrder(uint256 orderId, uint256 newPrice) external {
+    //     Order storage order = orders[orderId];
+    //     require(order.seller != address(0), "Order does not exist");
+    //     require(order.seller == msg.sender, "Not your order");
+
+    //     require(
+    //         newPrice <= ticket.getPrice(order.ticketId),
+    //         "New price exceeds original ticket price"
+    //     );
+
+    //     order.price = newPrice;
+    // }
+
+    // function buyOrder(
+    //     uint256 orderId,
+    //     uint256 loyaltyPointsRedeemed
+    // ) external payable {
+    //     Order storage order = orders[orderId];
+    //     require(order.seller != address(0), "Order does not exist");
+
+    //     address buyer = msg.sender;
+    //     uint256 eventId = order.eventId;
+    //     uint256 ticketId = order.ticketId;
+    //     uint256 price = order.price;
+
+    //     require(
+    //         block.timestamp < ticket.getEventTime(ticketId),
+    //         "Cannot buy tickets for expired events."
+    //     );
+    //     require(
+    //         userWallet[buyer][eventId].length < 4,
+    //         "Purchase limit exceeded. You can only own 4 tickets per event."
+    //     );
+    //     require(
+    //         loyaltyPoints[buyer] >= loyaltyPointsRedeemed,
+    //         "Not enough loyalty points"
+    //     );
+    //     require(loyaltyPointsRedeemed <= price, "Too many points used");
+
+    //     require(loyaltyPoints[buyer] >= loyaltyPointsRedeemed, "Not enough loyalty points");
+    //     uint256 sgdRemaining = price - (loyaltyPointsRedeemed/100); //assume 100 loyalty point = 1 SGD
+    //     uint256 requiredEth = sgdToWei(sgdRemaining);
+    //     require(msg.value == requiredEth, "Incorrect ETH sent"); //implement eth to sgd conversion later
+
+    //     // burn loyalty points
+    //     loyaltyPoints[buyer] -= loyaltyPointsRedeemed;
+
+    //     // contract pay seller full price
+    //     payable(order.seller).transfer(price);
+
+    //     ticket.transferFrom(address(this), buyer, ticketId);
+    //     delete orders[orderId];
+
+    //     emit TicketBought(orderId, buyer, ticketId, price);
+    // }
 }
-
-
-/*
-to do 
-
-    - Ticket mapping to make primary buying easier
-    -  Buy Ticket -> Ticekt mapping (Event -> ticketId) -> give them next avail tix with regards to cat and event
-
-*/
