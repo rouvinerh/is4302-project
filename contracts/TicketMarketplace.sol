@@ -88,6 +88,22 @@ contract TicketMarketplace {
         delete ticketToIndex[ticketId];
     }
 
+    // remove ticketId from prevOwner's wallet (similar pop-and-swap design as above)
+    function removeTicketFromWallet(
+        address seller,
+        uint256 eventId,
+        uint256 ticketId
+    ) internal {
+        uint256[] storage sellerTickets = userWallet[seller][eventId];
+        for (uint256 i = 0; i < sellerTickets.length; i++) {
+            if (sellerTickets[i] == ticketId) {
+                sellerTickets[i] = sellerTickets[tickets.length - 1]; // swap with last
+                sellerTickets.pop(); // remove last
+                break;
+            }
+        }
+    }
+
     /* Main Functions */
 
     // we should make this method payable and charge eventOrg for creating events
@@ -141,9 +157,12 @@ contract TicketMarketplace {
     ) external payable {
         address memory buyer = msg.sender;
         ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+        uint256 eventId = ticketDetails.eventId;
+        address seller = ticketDetails.owner;
+        address organiser = events[eventId].organiser;
 
         require(
-            userWallet[buyer][ticketDetails.eventId].length < 4,
+            userWallet[buyer][eventId].length < 4,
             "Purchase limit exceeded. You can only own 4 tickets per event."
         );
         require(
@@ -160,14 +179,20 @@ contract TicketMarketplace {
 
         // assume prevOnly transferred to TicketMarketplace
         // transfer ticket over to buyer logic @ price, make payable
+        uint256 payout;
+        if (seller == organiser) {
+            payout = (requiredEth * 90) / 100;
+        } else {
+            payout = requiredEth;
+        }
         ticketNFT.transferTicket(buyer, ticketId);
-        payable(ticketDetails.prevOwner).transfer(ticketPriceSGD); //TODO: need convert to weiToSGD & take 10% commission
-
-        userWallet[buyer][ticketDetails.eventId].push(ticketId);
-        //TODO: update prevOwners userWallet
+        payable(seller).transfer(payout); //TODO: need convert to weiToSGD & take 10% commission (done)
+        userWallet[buyer][eventId].push(ticketId);
+        //TODO: update prevOwners userWallet (done)
+        removeTicketFromWallet(seller, eventId, ticketId);
 
         // helper function
-        removeFromTicketsForSale(ticketDetails.eventId, ticketId);
+        removeFromTicketsForSale(eventId, ticketId);
 
         // emit event
         emit TicketBought(ticketId, buyer, ticketPriceSGD);
