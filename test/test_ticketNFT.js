@@ -7,7 +7,8 @@ describe("TicketNFT", function () {
     let owner, buyer1, buyer2, others;
 
     this.beforeEach(async function () {
-        [owner, buyer1, buyer2, ...others] = await ethers.getSigners();
+        // add some other users
+        [owner, eventOrganiser, admin, buyer1, buyer2, ...others] = await ethers.getSigners();
 
         // deploy TicketNFT
         TicketNFT = await ethers.getContractFactory("TicketNFT");
@@ -23,24 +24,43 @@ describe("TicketNFT", function () {
     // Test 2: Mint ticket NFTs by different player
     it("Should mint ticket NFTs successfully", async function () {
         // Mint ticket 0 for buyer 0
-        const tx1 = await ticketNFT.connect(owner).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100);
+        const tx1 = await ticketNFT.connect(owner).createTicket(
+            1,               
+            owner.address,       // event Org address
+            "A",                 // Category
+            "A1",                // Seat Number
+            100                  // Price
+        );
         await tx1.wait();
 
         // Mint ticket 1 for buyer 1
-        const tx2 = await ticketNFT.connect(owner).createTicket(buyer2, "Event Name", 123213131, "A", "A2", 100);
+        const tx2 = await ticketNFT.connect(owner).createTicket(
+            2,               
+            owner.address,       // event Org address
+            "A",                 // Category
+            "A1",                // Seat Number
+            100                  // Price
+        );
         await tx2.wait();
 
         let ownerOfTicket0 = await ticketNFT.ownerOf(0);
         let ownerOfTicket1 = await ticketNFT.ownerOf(1);
-
-        expect(ownerOfTicket0).to.be.equal(await buyer1.getAddress());
-        expect(ownerOfTicket1).to.be.equal(await buyer2.getAddress());
+            
+        // create event for 2 tickets, send to owner
+        expect(ownerOfTicket0).to.be.equal(await owner.getAddress());
+        expect(ownerOfTicket1).to.be.equal(await owner.getAddress());
     });
+
 
     // Test 3: Only owner can mint
     it("Should throw error when non-owner attempts to mint", async function () {
-        await expect(ticketNFT.connect(buyer1).createTicket(buyer1, "Event Name", 123213131, "A", "A1", 100))
-            .to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount");
+        await expect(ticketNFT.connect(buyer1).createTicket(
+            2,               
+            owner.address,       // event Org address
+            "A",                 // Category
+            "A1",                // Seat Number
+            100                  // Price
+        ).to.be.revertedWithCustomError(ticketNFT, "OwnableUnauthorizedAccount"));
     });
 
     // Test 4: Verify Approval for single NFT

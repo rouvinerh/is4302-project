@@ -4,6 +4,7 @@ pragma solidity ^0.8.22;
 
 import "./TicketNFT.sol";
 import "./LoyaltyToken.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract TicketMarketplace {
     enum userRoleEnum {
@@ -97,7 +98,7 @@ contract TicketMarketplace {
         uint256[] storage sellerTickets = userWallet[seller][eventId];
         for (uint256 i = 0; i < sellerTickets.length; i++) {
             if (sellerTickets[i] == ticketId) {
-                sellerTickets[i] = sellerTickets[tickets.length - 1]; // swap with last
+                sellerTickets[i] = sellerTickets[sellerTickets.length - 1]; // swap with last
                 sellerTickets.pop(); // remove last
                 break;
             }
@@ -111,9 +112,9 @@ contract TicketMarketplace {
         string memory eventName,
         uint256 eventTime
     ) public onlyEventOrganiser {
-        uint256 memory eventId = _nextEventId++;
+        uint256 eventId = _nextEventId++;
 
-        events[eventId].name = eventName;
+        events[eventId].eventName = eventName;
         events[eventId].eventTime = eventTime;
         events[eventId].organiser = msg.sender;
 
@@ -129,12 +130,12 @@ contract TicketMarketplace {
             } else {
                 category = "catC";
             }
-
+            string memory seatNumber = Strings.toString(i);
             uint256 returnedTicketId = ticketNFT.createTicket(
                 eventId,
                 msg.sender, //event org address
                 category,
-                i, //seat number
+                seatNumber, //seat number
                 100 //price, CONSTANT for now but need to handle logic for diff price for diff category
             );
 
@@ -155,8 +156,8 @@ contract TicketMarketplace {
         uint256 ticketId,
         uint256 loyaltyPointsToRedeem //cat
     ) external payable {
-        address memory buyer = msg.sender;
-        ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+        address buyer = msg.sender;
+        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
         uint256 eventId = ticketDetails.eventId;
         address seller = ticketDetails.owner;
         address organiser = events[eventId].organiser;
@@ -177,15 +178,14 @@ contract TicketMarketplace {
 
         loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
 
-        // assume prevOnly transferred to TicketMarketplace
-        // transfer ticket over to buyer logic @ price, make payable
         uint256 payout;
         if (seller == organiser) {
             payout = (requiredEth * 90) / 100;
         } else {
             payout = requiredEth;
         }
-        ticketNFT.transferTicket(buyer, ticketId);
+        
+        ticketNFT.transferTicket(ticketId, buyer);
         payable(seller).transfer(payout); //TODO: need convert to weiToSGD & take 10% commission (done)
         userWallet[buyer][eventId].push(ticketId);
         //TODO: update prevOwners userWallet (done)
@@ -202,8 +202,8 @@ contract TicketMarketplace {
         // string memory eventName = eventNames[eventId];
     }
 
-    function redeemTicket(uint256 ticketId) {
-        ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+    function redeemTicket(uint256 ticketId) external {
+        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
 
         require(
             block.timestamp < events[ticketDetails.eventId].eventTime,
@@ -218,7 +218,7 @@ contract TicketMarketplace {
     }
 
     function listTicket(uint256 ticketId, uint256 listedPrice) external {
-        ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
 
         require(
             block.timestamp < events[ticketDetails.eventId].eventTime,
@@ -255,8 +255,8 @@ contract TicketMarketplace {
     }
 
     function unlistTicket(uint256 ticketId) external {
-        ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
-        ticketNFT.transferTicket(address(this), msg.sender, ticketId);
+        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+        ticketNFT.transferTicket(ticketId, msg.sender);
 
         // helper function
         removeFromTicketsForSale(ticketDetails.eventId, ticketId);

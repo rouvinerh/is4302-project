@@ -6,7 +6,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TicketNFT is ERC721, Ownable {
-    enum ticketStateEnum { OWNED, LISTED, REDEEMED }
+    enum ticketState { OWNED, LISTED, REDEEMED }
     
     struct ticket {
         uint256 ticketId;
@@ -31,6 +31,7 @@ contract TicketNFT is ERC721, Ownable {
         _;
     }
 
+    // custom modifier
     modifier ownerOnly(uint256 ticketId) {
         require(tickets[ticketId].owner == msg.sender, "Caller is not the owner");
         _;
@@ -54,49 +55,49 @@ contract TicketNFT is ERC721, Ownable {
         uint256 price // CONSTANT, different from order price
         // string memory eventName, 
         // uint256 eventTime, //unix timestamp 
-    ) public onlyOwner returns (uint256) {      //onlyOwner: only owner of this contract can call i.e admin address (might need to use dummy account to deploy TicketNFT then tranf ownership to TicketMarketplace)
+    ) public onlyOwner returns (uint256) {      //ownerOnly: only owner of this contract can call i.e admin address (might need to use dummy account to deploy TicketNFT then tranf ownership to TicketMarketplace)
         uint256 tokenId = _nextTokenId++;
 
         // Create a new ticket object
         ticket memory newTicket = ticket(
             tokenId,
             eventId,
-            eventOrgAddress
+            eventOrgAddress,
             address(0),
             category,
             seatNumber,
             price,
-            ticketStateEnum.LISTED
+            ticketState.LISTED
             
             // eventName,
             // eventTime,
         );
 
-        _safeMint(to, tokenId);
+        _safeMint(eventOrgAddress, tokenId);
         tickets[tokenId] = newTicket;
 
         return tokenId;
     }
     
-    function transferTicket(uint256 ticketId, address newOwner) public validTicketId(ticketId) onlyOwner(ticketId) {
+    function transferTicket(uint256 ticketId, address newOwner) public validTicketId(ticketId) ownerOnly(ticketId) {
         _safeTransfer(tickets[ticketId].owner, newOwner, ticketId);
         tickets[ticketId].prevOwner = tickets[ticketId].owner;
         tickets[ticketId].owner = newOwner;
-        tickets[ticketId].state = ticketStateEnum.OWNED;
+        tickets[ticketId].state = ticketState.OWNED;
     }
 
-    function listTicket(uint256 ticketId) public validTicketId(ticketId) onlyOwner(ticketId) {
-        tickets[ticketId].state = ticketStateEnum.LISTED;
+    function listTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
+        tickets[ticketId].state = ticketState.LISTED;
     }
 
-    function unListTicket(uint256 ticketId) public validTicketId(ticketId) onlyOwner(ticketId) {
-        tickets[ticketId].state = ticketStateEnum.OWNED;
+    function unListTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
+        tickets[ticketId].state = ticketState.OWNED;
     }
 
-    function redeemTicket(uint256 ticketId) public validTicketId(ticketId) onlyOwner {
-        require(tickets[ticketId].state != ticketStateEnum.REDEEMED, "Ticket has already been redeemed.");
+    function redeemTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
+        require(tickets[ticketId].state != ticketState.REDEEMED, "Ticket has already been redeemed.");
         // redeem loyalty points here? no.
-        tickets[ticketId].state = ticketStateEnum.REDEEMED;
+        tickets[ticketId].state = ticketState.REDEEMED;
     }
 
     function getTicketDetails(uint256 ticketId) public view validTicketId(ticketId) returns (ticket memory) {
