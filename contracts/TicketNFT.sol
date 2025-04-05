@@ -80,7 +80,7 @@ contract TicketNFT is ERC721, Ownable {
     }
     
     function transferTicket(uint256 ticketId, address newOwner) public validTicketId(ticketId) ownerOnly(ticketId) {
-        _safeTransfer(tickets[ticketId].owner, newOwner, ticketId);
+        _transfer(tickets[ticketId].owner, newOwner, ticketId);
         tickets[ticketId].prevOwner = tickets[ticketId].owner;
         tickets[ticketId].owner = newOwner;
         tickets[ticketId].state = ticketState.OWNED;
@@ -97,6 +97,10 @@ contract TicketNFT is ERC721, Ownable {
     function redeemTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
         require(tickets[ticketId].state != ticketState.REDEEMED, "Ticket has already been redeemed.");
         tickets[ticketId].state = ticketState.REDEEMED;
+    }
+
+    function setTicketPrice(uint256 ticketId, uint256 newPrice) public validTicketId(ticketId) ownerOnly(ticketId) {
+        tickets[ticketId].price = newPrice;
     }
 
     function getTicketDetails(uint256 ticketId) public view validTicketId(ticketId) returns (ticket memory) {

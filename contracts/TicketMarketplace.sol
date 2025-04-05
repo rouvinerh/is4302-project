@@ -63,6 +63,16 @@ contract TicketMarketplace {
 
     constructor(address _ticketNFT) {
         ticketNFT = TicketNFT(_ticketNFT);
+        userRoles[msg.sender] = userRoleEnum.ADMIN; // Set deployer as admin
+    }
+
+    function setUserRole(address user, userRoleEnum role) external onlyAdmin {
+        userRoles[user] = role;
+    }
+
+    // Add function to set loyalty points
+    function setLoyaltyPoints(address user, uint256 points) external onlyAdmin {
+        loyaltyPoints[user] = points;
     }
 
     /* Helper Functions */
@@ -163,6 +173,11 @@ contract TicketMarketplace {
         address organiser = events[eventId].organiser;
 
         require(
+            block.timestamp < events[eventId].eventTime,
+            "Event is expired"
+        );
+
+        require(
             userWallet[buyer][eventId].length < 4,
             "Purchase limit exceeded. You can only own 4 tickets per event."
         );
@@ -235,8 +250,11 @@ contract TicketMarketplace {
         //     "You don't own this ticket."
         // );
 
-        // assume owner manually transfer to TicketMarketplace
-        // ticket.transferTicket(ticketId, address(this));
+        // List the ticket using TicketNFT's listTicket function
+        ticketNFT.listTicket(ticketId);
+
+        // Update the ticket's price to the listed price
+        ticketNFT.setTicketPrice(ticketId, listedPrice);
 
         //store listed tickets to the mapping ticketsForSale;
         ticketsForSale[ticketDetails.eventId].push(ticketId);
@@ -378,4 +396,6 @@ contract TicketMarketplace {
 
     //     emit TicketBought(orderId, buyer, ticketId, price);
     // }
+
+    receive() external payable {}
 }
