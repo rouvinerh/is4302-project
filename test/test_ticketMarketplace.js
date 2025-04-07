@@ -333,6 +333,9 @@ describe("TicketMarketplace", function () {
             const ticketOwner = await ticketNFT.getTicketOwner(ticketId);
             expect(ticketOwner).to.equal(buyer1.address);
 
+            // Approve marketplace to redeem the ticket
+            await ticketNFT.connect(buyer1).approve(await ticketMarketplace.getAddress(), ticketId);
+
             await expect(ticketMarketplace.connect(buyer1).redeemTicket(ticketId))
                 .to.emit(ticketMarketplace, "TicketRedeemed")
                 .withArgs(ticketId, buyer1.address);
@@ -348,24 +351,33 @@ describe("TicketMarketplace", function () {
         });
 
         it("Should not allow ticket redemption after event time", async function () {
-            // Create an expired event and buy a ticket
+            // Create an event that's not expired (for buying the ticket)
+            const validEventName = "Valid Concert";
+            const validEventTime = Math.floor(Date.now() / 1000) + 86400;
+            await ticketMarketplace.connect(eventOrganiser).createEvent(validEventName, validEventTime);
+            
+            const validTicketId = 200; // First ticket of the new event
+            const ticketDetails = await ticketNFT.getTicketDetails(validTicketId);
+            const priceInWei = await ticketMarketplace.sgdToWei(ticketDetails.price);
+
+            // Transfer ticket to marketplace
+            await ticketNFT.connect(eventOrganiser).transferTicket(validTicketId, await ticketMarketplace.getAddress());
+
+            // Buy the ticket
+            await ticketMarketplace.connect(buyer1).buyTicket(validTicketId, 0, { value: priceInWei });
+
+            // Verify ticket is owned by buyer1
+            const ticketOwner = await ticketNFT.getTicketOwner(validTicketId);
+            expect(ticketOwner).to.equal(buyer1.address);
+
+            // Approve marketplace to redeem the ticket
+            await ticketNFT.connect(buyer1).approve(await ticketMarketplace.getAddress(), validTicketId);
+
+            // Create an expired event instead
             const expiredEventName = "Expired Concert";
             const expiredEventTime = Math.floor(Date.now() / 1000) - 86400; // 1 day ago
             await ticketMarketplace.connect(eventOrganiser).createEvent(expiredEventName, expiredEventTime);
-            
-            const expiredTicketId = 200; // First ticket of the new event
-            const ticketDetails = await ticketNFT.getTicketDetails(expiredTicketId);
-            const priceInWei = await ticketMarketplace.sgdToWei(ticketDetails.price);
-
-            // Transfer expired ticket to marketplace
-            await ticketNFT.connect(eventOrganiser).transferTicket(expiredTicketId, await ticketMarketplace.getAddress());
-
-            // Buy the expired ticket
-            await ticketMarketplace.connect(buyer1).buyTicket(expiredTicketId, 0, { value: priceInWei });
-
-            // Verify ticket is owned by buyer1
-            const ticketOwner = await ticketNFT.getTicketOwner(expiredTicketId);
-            expect(ticketOwner).to.equal(buyer1.address);
+            const expiredTicketId = 400; // First ticket of expired event
 
             await expect(ticketMarketplace.connect(buyer1).redeemTicket(expiredTicketId))
                 .to.be.revertedWith("Event is expired");

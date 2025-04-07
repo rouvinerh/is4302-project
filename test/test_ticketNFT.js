@@ -119,7 +119,7 @@ describe("TicketNFT", function () {
     });
 
      // Test 5: Only owner can redeem Ticket
-     it("Should throw error when non-owner attempts to redeem", async function () {
+     it("Should throw error when non-owner or approved attempts to redeem", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
             1,                // Event ID
@@ -131,11 +131,11 @@ describe("TicketNFT", function () {
         await tx1.wait();
 
         await expect(ticketNFT.connect(buyer1).redeemTicket(0))
-            .to.be.revertedWith("Caller is not the owner");
+            .to.be.revertedWith("Caller is not the owner or approved");
     });
 
     // Test 6: Cannot redeem already redeemed ticket
-    it("Should throw error when non-owner attempts to redeem", async function () {
+    it("Should throw error when non-owner or approved attempts to redeem", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
             1,                // Event ID
