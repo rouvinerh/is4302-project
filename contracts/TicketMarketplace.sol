@@ -23,7 +23,7 @@ contract TicketMarketplace {
     TicketNFT public ticketNFT;
     uint256 private _nextEventId;
     uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
-    uint256 private comissionStorage;
+    uint256 private commissionStorage;
 
     mapping(address => userRoleEnum) public userRoles;
     mapping(uint256 => Event) public events; //eventId to event struct
@@ -111,7 +111,8 @@ contract TicketMarketplace {
     // we should make this method payable and charge eventOrg for creating events
     function createEvent(
         string memory eventName,
-        uint256 eventTime
+        uint256 eventTime,
+        uint256[3] memory categoryPrices // [catA, catB, catC]
     ) public onlyEventOrganiser {
         uint256 eventId = _nextEventId++;
 
@@ -124,12 +125,17 @@ contract TicketMarketplace {
         // assume simple stuff cus 12000 is hella gas
         for (uint256 i = 0; i < 200; i++) {
             string memory category;
+            uint256 price;
+
             if (i < 40) {
                 category = "catA";
+                price = categoryPrices[0];
             } else if (i < 100) {
                 category = "catB";
+                price = categoryPrices[1];
             } else {
                 category = "catC";
+                price = categoryPrices[2];
             }
             string memory seatNumber = Strings.toString(i);
             uint256 returnedTicketId = ticketNFT.createTicket(
@@ -137,7 +143,7 @@ contract TicketMarketplace {
                 msg.sender, //event org address
                 category,
                 seatNumber, //seat number
-                100 //price, CONSTANT for now but need to handle logic for diff price for diff category
+                price
             );
 
             //store new tickets to the mapping ticketsForSale;
@@ -170,7 +176,7 @@ contract TicketMarketplace {
 
         require(
             userWallet[buyer][eventId].length < 4,
-            "Purchase limit exceeded. You can only own 4 tickets per event."
+            "Purchase limit exceeded"
         );
         require(
             loyaltyPoints[buyer] >= loyaltyPointsToRedeem,
@@ -187,7 +193,7 @@ contract TicketMarketplace {
         uint256 payout;
         if (seller == organiser) {
             payout = (requiredEth * 90) / 100;
-            comissionStorage += (requiredEth - payout);
+            commissionStorage += (requiredEth - payout);
         } else {
             payout = requiredEth;
         }
@@ -227,10 +233,10 @@ contract TicketMarketplace {
             "Event is expired"
         );
 
-        require(listedPrice > 0, "Listed price must be greater than zero.");
+        require(listedPrice > 0, "Listed price must be more than zero");
         require(
             listedPrice <= ticketDetails.price,
-            "Listed price cannot be more than original price."
+            "Listed price cannot exceed original price"
         );
 
         // List the ticket using TicketNFT's listTicket function

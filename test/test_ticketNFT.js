@@ -151,6 +151,6 @@ describe("TicketNFT", function () {
         await tx2.wait();
 
         // Attempt to redeem the same ticket again
-        await expect(ticketNFT.connect(owner).redeemTicket(0)).to.be.revertedWith("Ticket has already been redeemed.");
+        await expect(ticketNFT.connect(owner).redeemTicket(0)).to.be.revertedWith("Ticket has already been redeemed");
     });
 })

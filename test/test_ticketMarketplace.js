@@ -158,7 +158,7 @@ describe("TicketMarketplace", function () {
             
             // Try to buy the 5th ticket
             await expect(ticketMarketplace.connect(buyer1).buyTicket(fifthTicketId, 0, { value: priceInWei }))
-                .to.be.revertedWith("Purchase limit exceeded. You can only own 4 tickets per event.");
+                .to.be.revertedWith("Purchase limit exceeded");
         });
     });
 
