@@ -30,6 +30,7 @@ contract TicketMarketplace {
     TicketNFT public ticketNFT;
     uint256 private _nextEventId;
     uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
+    uint256 private comissionStorage;
     // uint256 public orderCounter;
 
     mapping(address => userRoleEnum) public userRoles;
@@ -196,6 +197,7 @@ contract TicketMarketplace {
         uint256 payout;
         if (seller == organiser) {
             payout = (requiredEth * 90) / 100;
+            comissionStorage += (requiredEth - payout);
         } else {
             payout = requiredEth;
         }
