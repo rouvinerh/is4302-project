@@ -17,9 +17,6 @@ contract TicketNFT is ERC721, Ownable {
         string seatNumber;
         uint256 price;
         ticketState state;
-
-        // string eventName; shifted to details to eventStruct
-        // uint256 eventTime;
     }
 
     uint256 private _nextTokenId;
@@ -53,8 +50,6 @@ contract TicketNFT is ERC721, Ownable {
         string memory category, 
         string memory seatNumber, 
         uint256 price // CONSTANT, different from order price
-        // string memory eventName, 
-        // uint256 eventTime, //unix timestamp 
     ) public onlyOwner returns (uint256) {      //ownerOnly: only owner of this contract can call i.e admin address (might need to use dummy account to deploy TicketNFT then tranf ownership to TicketMarketplace)
         uint256 tokenId = _nextTokenId++;
 
@@ -68,9 +63,6 @@ contract TicketNFT is ERC721, Ownable {
             seatNumber,
             price,
             ticketState.LISTED
-            
-            // eventName,
-            // eventTime,
         );
 
         _safeMint(eventOrgAddress, tokenId);
@@ -122,12 +114,4 @@ contract TicketNFT is ERC721, Ownable {
     function getPrice(uint256 ticketId) public view validTicketId(ticketId) returns (uint256) {
         return tickets[ticketId].price;
     }
-
-    // function getEventName(uint256 ticketId) public view validTicketId(ticketId) returns (string) {
-    //     return tickets[ticketId].eventName;
-    // }
-
-    // function getEventTime(uint256 ticketId) public view validTicketId(ticketId) returns (uint256) {
-    //     return tickets[ticketId].eventTime;
-    // }
 }
