@@ -108,12 +108,14 @@ contract TicketMarketplace {
 
     /* Main Functions */
 
-    // we should make this method payable and charge eventOrg for creating events
     function createEvent(
         string memory eventName,
         uint256 eventTime,
         uint256[3] memory categoryPrices // [catA, catB, catC]
-    ) public onlyEventOrganiser {
+    ) public payable onlyEventOrganiser {
+        // charge event onboarding fee of $1000 SGD
+        require(msg.value >= sgdToWei(1000), "Insufficient onboarding fee.");
+
         uint256 eventId = _nextEventId++;
 
         events[eventId].eventName = eventName;

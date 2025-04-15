@@ -12,6 +12,16 @@ describe("TicketMarketplace", function () {
     let eventId;
     let ticketId;
 
+    const catPrices = [300, 200, 100]; // prices for catA, catB and catC
+    const eventName = "Test Concert";
+    const expiredEventName = "Expired Concert";
+    const validEventTime = Math.floor(Date.now() / 1000) + 86400; // 1 day from now
+    const expiredEventTime = Math.floor(Date.now() / 1000) - 86400; // 1 day ago
+
+    async function getOnboardingFee() {
+        return await ticketMarketplace.sgdToWei(1000);
+    }
+
     beforeEach(async function () {
         [owner, eventOrganiser, buyer1, buyer2, buyer3] = await ethers.getSigners();
 
@@ -37,24 +47,20 @@ describe("TicketMarketplace", function () {
 
     describe("Event Creation", function () {
         it("Should allow event organiser to create an event", async function () {
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400; // 1 day from now
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await expect(ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices))
+            const onboardingFeeInWei = await getOnboardingFee();
+            await expect(ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei }))
                 .to.emit(ticketMarketplace, "EventCreated")
                 .withArgs(0, eventName);
 
             const event = await ticketMarketplace.events(0);
             expect(event.eventName).to.equal(eventName);
-            expect(event.eventTime).to.equal(eventTime);
+            expect(event.eventTime).to.equal(validEventTime);
             expect(event.organiser).to.equal(eventOrganiser.address);
         });
 
         it("Should not allow non-event organisers to create events", async function () {
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await expect(ticketMarketplace.connect(buyer1).createEvent(eventName, eventTime, catPrices))
+            const onboardingFeeInWei = await getOnboardingFee();
+            await expect(ticketMarketplace.connect(buyer1).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei }))
                 .to.be.revertedWith("Not organiser!");
         });
     });
@@ -62,10 +68,8 @@ describe("TicketMarketplace", function () {
     describe("Primary Market Purchase", function () {
         beforeEach(async function () {
             // Create an event
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
             eventId = 0;
             ticketId = 0; // First ticket in the event
 
@@ -91,10 +95,8 @@ describe("TicketMarketplace", function () {
 
         it("Should not allow purchase of expired event tickets", async function () {
             // Create an expired event
-            const eventName = "Expired Concert";
-            const eventTime = Math.floor(Date.now() / 1000) - 86400; // 1 day ago
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(expiredEventName, expiredEventTime, catPrices, { value: onboardingFeeInWei });
             
             const expiredTicketId = 200; // First ticket of the new event
             const ticketDetails = await ticketNFT.getTicketDetails(expiredTicketId);
@@ -166,10 +168,8 @@ describe("TicketMarketplace", function () {
     describe("Secondary Market Purchase", function () {
         beforeEach(async function () {
             // Create an event and buy a ticket
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
             eventId = 0;
             ticketId = 0;
 
@@ -260,10 +260,8 @@ describe("TicketMarketplace", function () {
     describe("Loyalty Points", function () {
         beforeEach(async function () {
             // Create an event
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
             eventId = 0;
             ticketId = 0;
 
@@ -312,10 +310,8 @@ describe("TicketMarketplace", function () {
     describe("Ticket Redemption", function () {
         beforeEach(async function () {
             // Create an event and buy a ticket
-            const eventName = "Test Concert";
-            const eventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, eventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
             eventId = 0;
             ticketId = 0;
 
@@ -356,10 +352,8 @@ describe("TicketMarketplace", function () {
 
         it("Should not allow ticket redemption after event time", async function () {
             // Create an event that's not expired (for buying the ticket)
-            const validEventName = "Valid Concert";
-            const validEventTime = Math.floor(Date.now() / 1000) + 86400;
-            const catPrices = [300, 200, 100]; // prices for catA, catB and catC
-            await ticketMarketplace.connect(eventOrganiser).createEvent(validEventName, validEventTime, catPrices);
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
             
             const validTicketId = 200; // First ticket of the new event
             const ticketDetails = await ticketNFT.getTicketDetails(validTicketId);
@@ -379,9 +373,7 @@ describe("TicketMarketplace", function () {
             await ticketNFT.connect(buyer1).approve(await ticketMarketplace.getAddress(), validTicketId);
 
             // Create an expired event instead
-            const expiredEventName = "Expired Concert";
-            const expiredEventTime = Math.floor(Date.now() / 1000) - 86400; // 1 day ago
-            await ticketMarketplace.connect(eventOrganiser).createEvent(expiredEventName, expiredEventTime, catPrices);
+            await ticketMarketplace.connect(eventOrganiser).createEvent(expiredEventName, expiredEventTime, catPrices, { value: onboardingFeeInWei });
             const expiredTicketId = 400; // First ticket of expired event
 
             await expect(ticketMarketplace.connect(buyer1).redeemTicket(expiredTicketId))
