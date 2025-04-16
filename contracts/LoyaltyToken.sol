@@ -15,4 +15,8 @@ contract LoyaltyToken is ERC20, ERC20Burnable, Ownable {
     function mint(address to, uint256 amount) public onlyOwner {
         _mint(to, amount);
     }
+
+    function burn(address from, uint256 amount) public onlyOwner {
+        burnFrom(from, amount);
+    }
 }

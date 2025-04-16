@@ -135,7 +135,7 @@ describe("TicketNFT", function () {
     });
 
     // Test 6: Cannot redeem already redeemed ticket
-    it("Should throw error when non-owner or approved attempts to redeem", async function () {
+    it("Should throw error when attempting to redeem a redeemed ticket", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
             1,                // Event ID
