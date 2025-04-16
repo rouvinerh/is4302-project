@@ -5,8 +5,9 @@ pragma solidity ^0.8.22;
 import "./TicketNFT.sol";
 import "./LoyaltyToken.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract TicketMarketplace {
+contract TicketMarketplace is ReentrancyGuard {
     enum userRoleEnum {
         USER,
         EVENT_ORGANISER,
@@ -21,6 +22,7 @@ contract TicketMarketplace {
     }
 
     TicketNFT public ticketNFT;
+    LoyaltyToken public loyaltyToken;
     uint256 private _nextEventId;
     uint256 public constant ETH_TO_SGD = 1000; // 1 ETH = 1000 SGD
     uint256 private commissionStorage;
@@ -38,6 +40,8 @@ contract TicketMarketplace {
     event TicketListed(uint256 ticketId, address seller, uint256 price);
     event TicketUnlisted(uint256 ticketId);
     event TicketRedeemed(uint256 ticketId, address owner);
+    event FundsWithdrawn(address admin, uint256 withdrawableAmount);
+    event FundsDeposited(address admin, uint256 depositedAmount);
 
     modifier onlyAdmin() {
         require(userRoles[msg.sender] == userRoleEnum.ADMIN, "Not admin!");
@@ -52,8 +56,9 @@ contract TicketMarketplace {
         _;
     }
 
-    constructor(address _ticketNFT) {
+    constructor(address _ticketNFT, address _loyaltyToken) {
         ticketNFT = TicketNFT(_ticketNFT);
+        loyaltyToken = LoyaltyToken(_loyaltyToken);
         userRoles[msg.sender] = userRoleEnum.ADMIN; // Set deployer as admin
     }
 
@@ -161,7 +166,7 @@ contract TicketMarketplace {
     // transact in Wei/Eth
     function buyTicket(
         uint256 ticketId,
-        uint256 loyaltyPointsToRedeem 
+        uint256 loyaltyPointsToRedeem
     ) external payable {
         address buyer = msg.sender;
         TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(
@@ -296,6 +301,30 @@ contract TicketMarketplace {
         }
 
         bestPrice = lowestPrice;
+    }
+
+    /* Admin Functions */
+
+    function withdrawFunds() external nonReentrant onlyAdmin {
+        // withdrawal capped to ensure sufficient liquidity pool for token redemption
+        uint256 min_liquidity_pool_required = sgdToWei(loyaltyToken.totalSupply() / 100);
+        uint256 liquidity_pool = address(this).balance;
+        require(
+            liquidity_pool > min_liquidity_pool_required,
+            "No excess profit available for withdrawal, minimum liquidity pool to be retained."
+        );
+
+        uint256 withdrawableAmount = liquidity_pool - min_liquidity_pool_required;
+
+        // Transfer the amount to the admin
+        (bool success, ) = msg.sender.call{value: withdrawableAmount}("");
+        require(success, "Withdrawal failed");
+
+        emit FundsWithdrawn(msg.sender, withdrawableAmount);
+    }
+
+    function depositFunds() external payable onlyAdmin {
+        emit FundsDeposited(msg.sender, msg.value);
     }
 
     receive() external payable {}

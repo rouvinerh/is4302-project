@@ -30,12 +30,18 @@ describe("TicketMarketplace", function () {
         ticketNFT = await TicketNFT.deploy();
         await ticketNFT.waitForDeployment();
 
+        // Deploy LoyaltyToken
+        const LoyaltyToken = await ethers.getContractFactory("LoyaltyToken");
+        loyaltyToken = await LoyaltyToken.deploy();
+        await loyaltyToken.waitForDeployment();
+
         // Deploy TicketMarketplace
         const TicketMarketplace = await ethers.getContractFactory("TicketMarketplace");
-        ticketMarketplace = await TicketMarketplace.deploy(await ticketNFT.getAddress());
+        ticketMarketplace = await TicketMarketplace.deploy(await ticketNFT.getAddress(), await loyaltyToken.getAddress());
         await ticketMarketplace.waitForDeployment();
 
         // Set up roles
+        await ticketMarketplace.setUserRole(owner.address, 2); // ADMIN role
         await ticketMarketplace.setUserRole(eventOrganiser.address, 1); // EVENT_ORGANISER role
         await ticketMarketplace.setUserRole(buyer1.address, 0); // USER role
         await ticketMarketplace.setUserRole(buyer2.address, 0); // USER role
@@ -378,6 +384,69 @@ describe("TicketMarketplace", function () {
 
             await expect(ticketMarketplace.connect(buyer1).redeemTicket(expiredTicketId))
                 .to.be.revertedWith("Event is expired");
+        });
+    });
+
+    describe("Admin Fund Deposit & Withdrawal", function () {
+        const depositAmount = ethers.parseEther("1.0");
+
+        beforeEach(async function () {
+            // Mint LoyaltyToken to simulate ongoing TicketMarketplace ecosystem
+            await loyaltyToken.connect(owner).mint(buyer1.address, 100)
+            expect(await loyaltyToken.totalSupply()).to.equal(100); 
+        });
+
+        it("Should deposit funds into TicketMarketplace", async function () {
+            // Test deposit by admin
+            await expect(ticketMarketplace.connect(owner).depositFunds({ value: depositAmount }))
+                .to.emit(ticketMarketplace, "FundsDeposited")
+                .withArgs(owner.address, depositAmount);
+            
+            // Verify contract balance increased
+            expect(await ethers.provider.getBalance(await ticketMarketplace.getAddress()))
+                .to.equal(depositAmount);
+        });
+
+        it("Should not allow non-admin to deposit funds", async function () {
+            await expect(ticketMarketplace.connect(buyer1).depositFunds({ value: depositAmount }))
+                .to.be.revertedWith("Not admin!");
+        });
+
+        it("Should allow admin to withdraw funds from TicketMarketplace", async function () {
+            // Seed marketplace with ETH first
+            await ticketMarketplace.connect(owner).depositFunds({ value: depositAmount });
+
+            // Calculate expected withdrawable amount (total liquidity - min liquidity required)
+            const min_liquidity_pool_required = await ticketMarketplace.sgdToWei(await loyaltyToken.totalSupply() / 100n);
+            const expected_withdrawal = depositAmount - min_liquidity_pool_required;
+
+            const tx = await ticketMarketplace.connect(owner).withdrawFunds();
+            await expect(tx)
+                .to.emit(ticketMarketplace, "FundsWithdrawn")
+                .withArgs(owner.address, expected_withdrawal);
+                
+            await expect(tx) 
+                .to.changeEtherBalances(
+                    [ticketMarketplace, owner],
+                    [-expected_withdrawal, expected_withdrawal]
+                );
+        });
+
+        it("Should prevent withdrawal when liquidity is at minimum", async function () {
+            // Seed marketplace with ETH first
+            await ticketMarketplace.connect(owner).depositFunds({ value: depositAmount });
+
+            // First withdraw available funds
+            await ticketMarketplace.connect(owner).withdrawFunds();
+            
+            // Attempt another withdrawal (should fail)
+            await expect(ticketMarketplace.connect(owner).withdrawFunds())
+                .to.be.revertedWith("No excess profit available for withdrawal, minimum liquidity pool to be retained.");
+        });
+
+        it("Should not allow non-admin to withdraw funds from TicketMarketplace", async function () {
+            await expect(ticketMarketplace.connect(buyer1).withdrawFunds())
+                .to.be.revertedWith("Not admin!");
         });
     });
 });
