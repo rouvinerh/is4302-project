@@ -47,8 +47,9 @@ describe("TicketMarketplace", function () {
         await ticketMarketplace.setUserRole(buyer2.address, 0); // USER role
         await ticketMarketplace.setUserRole(buyer3.address, 0); // USER role
 
-        // Transfer ownership of TicketNFT to TicketMarketplace
+        // Transfer ownership of TicketNFT and LoyaltyToken to TicketMarketplace
         await ticketNFT.transferOwnership(await ticketMarketplace.getAddress());
+        await loyaltyToken.transferOwnership(await ticketMarketplace.getAddress());
     });
 
     describe("Event Creation", function () {
@@ -281,7 +282,10 @@ describe("TicketMarketplace", function () {
             
             // Set loyalty points for buyer (100 points = 1 SGD)
             const loyaltyPointsToUse = BigInt(1000); // 10 SGD worth of points
-            await ticketMarketplace.connect(owner).setLoyaltyPoints(buyer1.address, loyaltyPointsToUse);
+            await loyaltyToken.connect(await ethers.getImpersonatedSigner(await ticketMarketplace.getAddress())).mint(buyer1.address, loyaltyPointsToUse);
+
+            // Approve marketplace to burn token
+            await loyaltyToken.connect(buyer1).approve(await ticketMarketplace.getAddress(), loyaltyPointsToUse);
 
             // Calculate remaining ETH needed after loyalty points
             const sgdRemaining = BigInt(ticketDetails.price) - (loyaltyPointsToUse / BigInt(100));
@@ -292,7 +296,7 @@ describe("TicketMarketplace", function () {
                 .withArgs(ticketId, buyer1.address, ticketDetails.price);
 
             // Verify loyalty points were deducted
-            const remainingPoints = await ticketMarketplace.loyaltyPoints(buyer1.address);
+            const remainingPoints = await loyaltyToken.balanceOf(buyer1.address);
             expect(remainingPoints).to.equal(0);
         });
 
@@ -302,7 +306,10 @@ describe("TicketMarketplace", function () {
             
             // Set insufficient loyalty points for buyer
             const loyaltyPointsToUse = BigInt(1000); // 10 SGD worth of points
-            await ticketMarketplace.connect(owner).setLoyaltyPoints(buyer1.address, BigInt(500)); // Only 5 SGD worth of points
+            await loyaltyToken.connect(await ethers.getImpersonatedSigner(await ticketMarketplace.getAddress())).mint(buyer1.address, BigInt(500)); // Only 5 SGD worth of points
+
+            // Approve marketplace to burn token
+            await loyaltyToken.connect(buyer1).approve(await ticketMarketplace.getAddress(), loyaltyPointsToUse);
 
             // Calculate remaining ETH needed after loyalty points
             const sgdRemaining = BigInt(ticketDetails.price) - (loyaltyPointsToUse / BigInt(100));
@@ -348,7 +355,7 @@ describe("TicketMarketplace", function () {
 
             // Verify loyalty points were awarded
             const ticketDetails = await ticketNFT.getTicketDetails(ticketId);
-            const loyaltyPoints = await ticketMarketplace.loyaltyPoints(buyer1.address);
+            const loyaltyPoints = await loyaltyToken.balanceOf(buyer1.address);
             expect(loyaltyPoints).to.equal(ticketDetails.price);
 
             // Verify ticket state is REDEEMED
@@ -389,10 +396,18 @@ describe("TicketMarketplace", function () {
 
     describe("Admin Fund Deposit & Withdrawal", function () {
         const depositAmount = ethers.parseEther("1.0");
+        let gasCost = 0;
 
         beforeEach(async function () {
+            // Deposit some funds first
+            await expect(ticketMarketplace.connect(owner).depositFunds({ value: depositAmount }))
+                .to.emit(ticketMarketplace, "FundsDeposited")
+                .withArgs(owner.address, depositAmount);
+
             // Mint LoyaltyToken to simulate ongoing TicketMarketplace ecosystem
-            await loyaltyToken.connect(owner).mint(buyer1.address, 100)
+            const tx = await loyaltyToken.connect(await ethers.getImpersonatedSigner(await ticketMarketplace.getAddress())).mint(buyer1.address, 100)
+            const receipt = await tx.wait(); 
+            gasCost = receipt.gasUsed * tx.gasPrice;
             expect(await loyaltyToken.totalSupply()).to.equal(100); 
         });
 
@@ -402,9 +417,11 @@ describe("TicketMarketplace", function () {
                 .to.emit(ticketMarketplace, "FundsDeposited")
                 .withArgs(owner.address, depositAmount);
             
+            const expected_balance = ethers.parseEther("2.0") - gasCost //initial deposit + test deposit - gas cost
+            
             // Verify contract balance increased
             expect(await ethers.provider.getBalance(await ticketMarketplace.getAddress()))
-                .to.equal(depositAmount);
+                .to.equal(expected_balance);
         });
 
         it("Should not allow non-admin to deposit funds", async function () {
@@ -413,12 +430,9 @@ describe("TicketMarketplace", function () {
         });
 
         it("Should allow admin to withdraw funds from TicketMarketplace", async function () {
-            // Seed marketplace with ETH first
-            await ticketMarketplace.connect(owner).depositFunds({ value: depositAmount });
-
             // Calculate expected withdrawable amount (total liquidity - min liquidity required)
             const min_liquidity_pool_required = await ticketMarketplace.sgdToWei(await loyaltyToken.totalSupply() / 100n);
-            const expected_withdrawal = depositAmount - min_liquidity_pool_required;
+            const expected_withdrawal = depositAmount - min_liquidity_pool_required - gasCost;
 
             const tx = await ticketMarketplace.connect(owner).withdrawFunds();
             await expect(tx)

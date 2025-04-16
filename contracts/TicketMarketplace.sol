@@ -33,7 +33,6 @@ contract TicketMarketplace is ReentrancyGuard {
     mapping(uint256 => uint256[]) public ticketsForSale; // "marketWallet" eventId --> [] of ticketId
     mapping(uint256 => uint256) public ticketToIndex; // ticketId → index in ticketsForSale array
     mapping(address => mapping(uint256 => uint256[])) public userWallet; //nested mapping from address --> event --> [] of ticketId
-    mapping(address => uint256) public loyaltyPoints;
 
     event EventCreated(uint256 eventId, string eventName);
     event TicketBought(uint256 ticketId, address buyer, uint256 price);
@@ -64,11 +63,6 @@ contract TicketMarketplace is ReentrancyGuard {
 
     function setUserRole(address user, userRoleEnum role) external onlyAdmin {
         userRoles[user] = role;
-    }
-
-    // Add function to set loyalty points
-    function setLoyaltyPoints(address user, uint256 points) external onlyAdmin {
-        loyaltyPoints[user] = points;
     }
 
     /* Helper Functions */
@@ -186,7 +180,7 @@ contract TicketMarketplace is ReentrancyGuard {
             "Purchase limit exceeded"
         );
         require(
-            loyaltyPoints[buyer] >= loyaltyPointsToRedeem,
+            loyaltyToken.balanceOf(buyer) >= loyaltyPointsToRedeem,
             "Not enough loyalty points"
         );
 
@@ -195,7 +189,7 @@ contract TicketMarketplace is ReentrancyGuard {
         uint256 requiredEth = sgdToWei(sgdRemaining);
         require(msg.value == requiredEth, "Incorrect ETH sent");
 
-        loyaltyPoints[buyer] -= loyaltyPointsToRedeem;
+        loyaltyToken.burn(buyer, loyaltyPointsToRedeem);
 
         uint256 payout;
         if (seller == organiser) {
@@ -225,7 +219,7 @@ contract TicketMarketplace is ReentrancyGuard {
 
         address owner = msg.sender;
         ticketNFT.redeemTicket(ticketId);
-        loyaltyPoints[owner] += ticketDetails.price;
+        loyaltyToken.mint(owner, ticketDetails.price);
 
         emit TicketRedeemed(ticketId, owner);
     }
