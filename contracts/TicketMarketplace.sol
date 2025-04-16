@@ -256,10 +256,10 @@ contract TicketMarketplace is ReentrancyGuard {
     }
 
     function unlistTicket(uint256 ticketId) external {
-        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(
-            ticketId
-        );
+        TicketNFT.ticket memory ticketDetails = ticketNFT.getTicketDetails(ticketId);
+        
         ticketNFT.transferTicket(ticketId, msg.sender);
+        ticketNFT.unlistTicket(ticketId);
 
         // helper function
         removeFromTicketsForSale(ticketDetails.eventId, ticketId);

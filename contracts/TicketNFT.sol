@@ -82,7 +82,7 @@ contract TicketNFT is ERC721, Ownable {
         tickets[ticketId].state = ticketState.LISTED;
     }
 
-    function unListTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
+    function unlistTicket(uint256 ticketId) public validTicketId(ticketId) ownerOnly(ticketId) {
         tickets[ticketId].state = ticketState.OWNED;
     }
 
