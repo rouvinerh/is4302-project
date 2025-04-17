@@ -203,7 +203,7 @@ contract TicketMarketplace is ReentrancyGuard {
 
         require(block.timestamp < events[ticketDetails.eventId].eventTime, "Event is expired");
         require(listedPrice > 0, "Listed price must be more than zero");
-        require(listedPrice <= ticketDetails.purchasePrice, "Listed price cannot exceed  price it was bought at");
+        require(listedPrice <= ticketDetails.purchasePrice, "Listed price cannot exceed price ticket was bought at");
 
         ticketNFT.listTicket(ticketId);
         ticketNFT.setTicketPrice(ticketId, listedPrice);

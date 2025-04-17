@@ -278,7 +278,6 @@ describe("TicketMarketplace", function () {
 
         it("Should allow purchase with loyalty points", async function () {
             const ticketDetails = await ticketNFT.getTicketDetails(ticketId);
-            const priceInWei = await ticketMarketplace.sgdToWei(ticketDetails.price);
             
             // Set loyalty points for buyer (100 points = 1 SGD)
             const loyaltyPointsToUse = BigInt(1000); // 10 SGD worth of points
@@ -302,7 +301,6 @@ describe("TicketMarketplace", function () {
 
         it("Should not allow purchase with insufficient loyalty points", async function () {
             const ticketDetails = await ticketNFT.getTicketDetails(ticketId);
-            const priceInWei = await ticketMarketplace.sgdToWei(ticketDetails.price);
             
             // Set insufficient loyalty points for buyer
             const loyaltyPointsToUse = BigInt(1000); // 10 SGD worth of points
@@ -317,6 +315,31 @@ describe("TicketMarketplace", function () {
 
             await expect(ticketMarketplace.connect(buyer1).buyTicket(ticketId, loyaltyPointsToUse, { value: requiredEth }))
                 .to.be.revertedWith("Not enough loyalty points");
+        });
+
+        it("Should prevent resale above the last purchased price after redeeming loyalty points", async function () {
+            const ticketDetails = await ticketNFT.getTicketDetails(ticketId);
+            
+            // Set loyalty points for buyer (100 points = 1 SGD)
+            const loyaltyPointsToUse = BigInt(1000); // 10 SGD worth of points
+            await loyaltyToken.connect(await ethers.getImpersonatedSigner(await ticketMarketplace.getAddress())).mint(buyer1.address, loyaltyPointsToUse);
+
+            // Approve marketplace to burn token
+            await loyaltyToken.connect(buyer1).approve(await ticketMarketplace.getAddress(), loyaltyPointsToUse);
+
+            // Calculate remaining ETH needed after loyalty points
+            const sgdRemaining = BigInt(ticketDetails.price) - (loyaltyPointsToUse / BigInt(100));
+            const requiredEth = await ticketMarketplace.sgdToWei(Number(sgdRemaining));
+
+            await expect(ticketMarketplace.connect(buyer1).buyTicket(ticketId, loyaltyPointsToUse, { value: requiredEth }))
+                .to.emit(ticketMarketplace, "TicketBought")
+                .withArgs(ticketId, buyer1.address, ticketDetails.price);
+
+            // Verify loyalty points were deducted
+            const remainingPoints = await loyaltyToken.balanceOf(buyer1.address);
+            expect(remainingPoints).to.equal(0);
+
+            await expect(ticketMarketplace.connect(buyer1).listTicket(ticketId, ticketDetails.price)).to.be.revertedWith("Listed price cannot exceed price ticket was bought at");
         });
     });
 
