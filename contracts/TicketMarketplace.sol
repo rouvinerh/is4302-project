@@ -174,6 +174,7 @@ contract TicketMarketplace is ReentrancyGuard {
             commissionStorage += (requiredEth - payout);
         }
 
+        ticketNFT.setTicketPurchasePrice(ticketId, sgdRemaining);
         ticketNFT.transferTicket(ticketId, buyer);
         payable(seller).transfer(payout);
         userWallet[buyer][eventId].push(ticketId);
@@ -202,7 +203,7 @@ contract TicketMarketplace is ReentrancyGuard {
 
         require(block.timestamp < events[ticketDetails.eventId].eventTime, "Event is expired");
         require(listedPrice > 0, "Listed price must be more than zero");
-        require(listedPrice <= ticketDetails.price, "Listed price cannot exceed original price");
+        require(listedPrice <= ticketDetails.purchasePrice, "Listed price cannot exceed  price it was bought at");
 
         ticketNFT.listTicket(ticketId);
         ticketNFT.setTicketPrice(ticketId, listedPrice);

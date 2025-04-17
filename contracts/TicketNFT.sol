@@ -19,6 +19,7 @@ contract TicketNFT is ERC721, Ownable {
         string category;
         string seatNumber;
         uint256 price;
+        uint256 purchasePrice;
         ticketState state;
     }
 
@@ -57,7 +58,7 @@ contract TicketNFT is ERC721, Ownable {
     ) public onlyOwner returns (uint256) {      
         uint256 tokenId = _nextTokenId++;
 
-        // Create a new ticket object
+        // Create a new ticket object, initial purchase price = original price
         ticket memory newTicket = ticket(
             tokenId,
             eventId,
@@ -65,6 +66,7 @@ contract TicketNFT is ERC721, Ownable {
             address(0),
             category,
             seatNumber,
+            price,
             price,
             ticketState.LISTED
         );
@@ -101,6 +103,10 @@ contract TicketNFT is ERC721, Ownable {
 
     function setTicketPrice(uint256 ticketId, uint256 newPrice) public validTicketId(ticketId) ownerOnly(ticketId) {
         tickets[ticketId].price = newPrice;
+    }
+
+    function setTicketPurchasePrice(uint256 ticketId, uint256 purchasePrice) public validTicketId(ticketId) ownerOnly(ticketId) {
+        tickets[ticketId].purchasePrice = purchasePrice;
     }
 
     function getTicketDetails(uint256 ticketId) public view validTicketId(ticketId) returns (ticket memory) {
