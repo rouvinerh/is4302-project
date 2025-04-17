@@ -455,7 +455,7 @@ describe("TicketMarketplace", function () {
             
             // Attempt another withdrawal (should fail)
             await expect(ticketMarketplace.connect(owner).withdrawFunds())
-                .to.be.revertedWith("No excess profit available for withdrawal, minimum liquidity pool to be retained.");
+                .to.be.revertedWith("No excess profit available for withdrawal.");
         });
 
         it("Should not allow non-admin to withdraw funds from TicketMarketplace", async function () {

@@ -6,8 +6,11 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract TicketNFT is ERC721, Ownable {
+
+    // Enum for ticket states
     enum ticketState { OWNED, LISTED, REDEEMED }
     
+    // Struct for ticket data
     struct ticket {
         uint256 ticketId;
         uint256 eventId;
@@ -44,13 +47,14 @@ contract TicketNFT is ERC721, Ownable {
         return tokenId;
     }
 
+    // ownerOnly: Only marketplace can call this via createEvent() called by EVENT_ORG
     function createTicket(
         uint256 eventId,
         address eventOrgAddress,
         string memory category, 
         string memory seatNumber, 
         uint256 price // CONSTANT, different from order price
-    ) public onlyOwner returns (uint256) {      //ownerOnly: only owner of this contract can call i.e admin address (might need to use dummy account to deploy TicketNFT then tranf ownership to TicketMarketplace)
+    ) public onlyOwner returns (uint256) {      
         uint256 tokenId = _nextTokenId++;
 
         // Create a new ticket object
