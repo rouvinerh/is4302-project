@@ -496,7 +496,7 @@ describe("TicketMarketplace", function () {
     
         it("Should return the cheapest ticket that matches category and max price", async function () {
             const desiredCategory = "catA";
-            const maxPrice = 300; // SGD
+            const maxPrice = 300;
     
             const result = await ticketMarketplace.search(eventId, desiredCategory, maxPrice);
             const bestTicketId = result[0];
