@@ -486,4 +486,34 @@ describe("TicketMarketplace", function () {
                 .to.be.revertedWith("Not admin!");
         });
     });
+
+    describe("Search Function", function () {
+        beforeEach(async function () {
+            const onboardingFeeInWei = await getOnboardingFee();
+            await ticketMarketplace.connect(eventOrganiser).createEvent(eventName, validEventTime, catPrices, { value: onboardingFeeInWei });
+            eventId = 0;
+        });
+    
+        it("Should return the cheapest ticket that matches category and max price", async function () {
+            const desiredCategory = "catA";
+            const maxPrice = 300; // SGD
+    
+            const result = await ticketMarketplace.search(eventId, desiredCategory, maxPrice);
+            const bestTicketId = result[0];
+            const bestPrice = result[1];
+    
+            expect(bestPrice).to.be.lte(maxPrice);
+    
+            const ticketDetails = await ticketNFT.getTicketDetails(bestTicketId);
+            expect(ticketDetails.category).to.equal(desiredCategory);
+        });
+    
+        it("Should revert if no matching ticket is found", async function () {
+            const desiredCategory = "catA";
+            const maxPrice = 50;
+    
+            await expect(ticketMarketplace.search(eventId, desiredCategory, maxPrice))
+                .to.be.revertedWith("No matching offers");
+        });
+    });
 });
