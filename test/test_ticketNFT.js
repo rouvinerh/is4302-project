@@ -25,7 +25,7 @@ describe("TicketNFT", function () {
     it("Should mint ticket NFTs successfully", async function () {
         // Mint ticket 0 for event org 1
         const tx1 = await ticketNFT.connect(owner).createTicket(
-            1,               
+            1,               // Event ID
             eventOrganiser1.address,       // event Org address
             "A",                 // Category
             "A1",                // Seat Number
@@ -60,7 +60,7 @@ describe("TicketNFT", function () {
             "A",              // Category
             "A1",             // Seat Number
             100               // Price
-        )).to.be.reverted;    // i cant find the actual error, but it does revert
+        )).to.be.reverted;    // 
     });
 
     // Test 4: Transfer ticket from owner to buyer
@@ -95,7 +95,7 @@ describe("TicketNFT", function () {
 
     });
 
-    // Test 4: Redeem Ticket
+    // Test 5: Redeem Ticket
     it("Should redeem ticket successfully", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
@@ -118,7 +118,7 @@ describe("TicketNFT", function () {
         expect(await ticketNFT.getTicketState(0)).to.equal(2);
     });
 
-     // Test 5: Only owner can redeem Ticket
+     // Test 6: Only owner can redeem Ticket
      it("Should throw error when non-owner or approved attempts to redeem", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
@@ -134,7 +134,7 @@ describe("TicketNFT", function () {
             .to.be.revertedWith("Caller is not the owner or approved");
     });
 
-    // Test 6: Cannot redeem already redeemed ticket
+    // Test 7: Cannot redeem already redeemed ticket
     it("Should throw error when attempting to redeem a redeemed ticket", async function () {
         // Mint ticket 0 for buyer 0
         const tx1 =  await ticketNFT.connect(owner).createTicket(
